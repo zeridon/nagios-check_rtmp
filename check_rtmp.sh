@@ -2,9 +2,6 @@
 # FILE: "check_rtmp"
 # DESCRIPTION:nagios plugin for checking rtmp streams.
 # REQUIRES: rtmpdump (http://rtmpdump.mplayerhq.hu/)
-# AUTHOR: Toni Comerma
-# DATE: jan-2013
-# $Id:$
 #
 
 PROGNAME=`readlink -f $0`
@@ -22,15 +19,15 @@ print_usage() {
 }
 
 print_help() {
-  print_revision $PROGNAME $REVISION
+  echo $PROGNAME $REVISION
   echo ""
   print_usage
   
-	echo "Comprova l'estat d'un stream RTMP"
+	echo "Check the status of RTMP stream"
 	echo ""
 	echo "Opcions:"
 	echo "	-u URL a testejar Exemple: rtmp://server/app/streamName"
-	echo "	-t Temps a monitoritzar"
+	echo "	-t Time to monitor the stream"
 	echo ""
   exit $STATE_UNKNOWN
 }
@@ -52,45 +49,50 @@ do
 		u ) URL=$OPTARG;;
 		t ) TIMEOUT=$OPTARG;;
 		h ) print_help;;
-		* ) echo "unimplemented option";;
+		* ) echo "Unimplemented option";;
 		
 		esac
 done
 
 if [ ! $URL ] ; then 
-	echo " Error - No s'ha indicat URL a monitoritzar "
+	echo " Error - No URL specified to monitor "
 	echo ""
 	print_help
 	echo ""
+	exit $STATE_UNKNOWN
 fi
 
-# Construir noms de fitxers temporals
-NAME=`echo $URL | sed -e s/[^A-Za-z0-9.]/_/g`
-ERR=/tmp/check_rtmp_err_$NAME.tmp
+# Construct a temp name
+ERR=`mktemp /tmp/check_rtmp_err_XXXXXXXXX`
 
-# Testejant
-$RTMPDUMP --live -r $URL --stop $TIMEOUT > /dev/null 2> $ERR
+# Test it
+timeout --preserve-status `echo $(($TIMEOUT+2))` $RTMPDUMP --live -r $URL --stop $TIMEOUT > /dev/null 2> $ERR
 status=$?
 
 
-# Retorn de resultats
+# Parse the results
 CONNECTA=`grep "INFO: Connected" $ERR`
+
+video_width=`grep displayWidth $ERR | awk '{print $NF}' | cut -d\. -f1`
+video_height=`grep displayHeight $ERR | awk '{print $NF}' | cut -d\. -f1`
+video_framerate=`grep framerate $ERR | awk '{print $NF}'`
+video_vid_bitrate=`grep videodatarate $ERR| awk '{print $NF}'`
+video_aud_bitrate=`grep audiodatarate $ERR | awk '{print $NF}'`
 
 if [ -z "$CONNECTA" ]
 then
-  echo "CRITICAL - No es pot connectar al servidor: $URL"
+  echo "CRITICAL - No connection to server: $URL"
   exit $STATE_CRITICAL
 else
    ERROR=`grep "INFO: Metadata:" $ERR`
    if [ ! -z "$ERROR" ]
    then
-       echo "OK - Stream funcionant: $URL"
+       echo "OK - Stream working: $URL | video_width=$video_width video_height=$video_height video_framerate=$video_framerate video_video_bitrate=$video_vid_bitrate video_audio_bitrate=$video_aud_bitrate"
        exit $STATE_OK
     fi
-    echo "CRITICAL - Stream NO emetent: $URL"
+    echo "CRITICAL - Stream NOT working: $URL"
     exit $STATE_CRITICAL
 fi
 
-echo "UNKNOWN - Alguna condicio no esperada ha permes arribar fins aqui. Revisar check"
+echo "UNKNOWN - Something wrong hapened. Review the check."
 exit $STATE_UNKNOWN
-
