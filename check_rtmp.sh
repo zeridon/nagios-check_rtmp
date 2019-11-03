@@ -66,7 +66,7 @@ fi
 ERR=`mktemp /tmp/check_rtmp_err_XXXXXXXXX`
 
 # Test it
-timeout --preserve-status `echo $(($TIMEOUT+2))` $RTMPDUMP --live -r $URL --stop $TIMEOUT > /dev/null 2> $ERR
+timeout --preserve-status `echo $(($TIMEOUT+2))` $RTMPDUMP --live -r $URL --stop $TIMEOUT -o /dev/null 2> $ERR
 status=$?
 
 
@@ -81,7 +81,7 @@ video_aud_bitrate=`grep audiodatarate $ERR | awk '{print $NF}'`
 
 if [ -z "$CONNECTA" ]
 then
-  echo "CRITICAL - No connection to server: $URL"
+  echo "CRITICAL - No connection to server: $URL | video_width=-1 video_height=-1 video_framerate=-1 video_video_bitrate=-1 video_audio_bitrate=-1"
   exit $STATE_CRITICAL
 else
    ERROR=`grep "INFO: Metadata:" $ERR`
@@ -90,9 +90,11 @@ else
        echo "OK - Stream working: $URL | video_width=$video_width video_height=$video_height video_framerate=$video_framerate video_video_bitrate=$video_vid_bitrate video_audio_bitrate=$video_aud_bitrate"
        exit $STATE_OK
     fi
-    echo "CRITICAL - Stream NOT working: $URL"
+    echo "CRITICAL - Stream NOT working: $URL | video_width=-1 video_height=-1 video_framerate=-1 video_video_bitrate=-1 video_audio_bitrate=-1"
     exit $STATE_CRITICAL
 fi
 
-echo "UNKNOWN - Something wrong hapened. Review the check."
+echo "UNKNOWN - Something wrong hapened. Review the check. | video_width=-1 video_height=-1 video_framerate=-1 video_video_bitrate=-1 video_audio_bitrate=-1"
 exit $STATE_UNKNOWN
+
+rm -f $ERR
